@@ -106,7 +106,22 @@ class WordSearchGUI:
         self.note = tk.Label(self.root, font=(FONT, 10), bg=BG, fg=RED)
         self.note.pack()
         self.statlabel = tk.Label(self.root, font=(FONT, 9), bg=BG, fg="#5c5245")
-        self.statlabel.pack(pady=(0, 14))
+        self.statlabel.pack(pady=(0, 8))
+
+        # ---- جدول الـ Score Tracker ----
+        tk.Label(self.root, text="SCORE TRACKER", font=(FONT, 10, "bold"), bg=BG, fg=MUTED).pack()
+        tf = tk.Frame(self.root, bg=BG)
+        tf.pack(padx=24, pady=(4, 0))
+        self.tracklist = tk.Listbox(tf, width=60, height=6, font=("Courier", 10), bg=PANEL, fg=INK,
+                                    highlightthickness=0, bd=0, activestyle="none",
+                                    selectbackground=PANEL, selectforeground=INK)
+        tsb = tk.Scrollbar(tf, command=self.tracklist.yview)
+        self.tracklist.config(yscrollcommand=tsb.set)
+        self.tracklist.pack(side="left")
+        tsb.pack(side="left", fill="y")
+        self.tracksummary = tk.Label(self.root, font=(FONT, 10), bg=BG, fg=NAVY)
+        self.tracksummary.pack(pady=(4, 14))
+        self._shown_runs = -1
 
     def _bind_events(self):
         self.board.bind("<ButtonPress-1>", self.on_press)
@@ -200,10 +215,25 @@ class WordSearchGUI:
         kind_colors = {"win": GREEN_DARK, "lose": RED, "info": INK}
         self.msg.config(text=g.status_text, fg=kind_colors.get(g.status_kind, INK))
         self.statlabel.config(text=g.stats_text)
+        self.refresh_tracker()
         self.bar.delete("all")                                  # الوقت اللي عدّى بيكبر من اليمين
         w = self.bar.winfo_width()
         used = (TIME_LIMIT - g.left) / TIME_LIMIT
         self.bar.create_rectangle(w * (1 - used), 0, w, 5, fill=RED if low else NAVY, width=0)
+
+    # Redraws the score tracker table, only when a new run was saved.
+    def refresh_tracker(self):
+        runs = self.game.runs
+        if len(runs) == self._shown_runs:
+            return
+        self._shown_runs = len(runs)
+        self.tracklist.delete(0, tk.END)
+        self.tracklist.insert(tk.END, "%-4s %-7s %-7s %-7s %s" % ("Run", "Result", "Found", "Score", "Style"))
+        for n, run in enumerate(runs, 1):
+            found = "%d/%d" % (run["found"], run["total"])
+            self.tracklist.insert(tk.END, "%-4d %-7s %-7s %-7d %s" % (n, run["result"], found, run["score"], run["style"]))
+        self.tracklist.yview_moveto(1)
+        self.tracksummary.config(text=self.game.tracker_summary())
 
     # Resets everything and starts a fresh game.
     def new_game(self):
