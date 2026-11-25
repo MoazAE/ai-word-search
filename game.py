@@ -24,6 +24,9 @@ class WordSearchGame:
         self.positions = {}
         self.hint = None
         self.reveal = set()
+        self.runs = []                 # finished runs for the score tracker
+        self.recorded = True           # True = no live run waiting to be saved
+        self.style = ""
 
         self.status_text = ""
         self.status_kind = "info"
@@ -54,8 +57,27 @@ class WordSearchGame:
     def can_afford_hint(self):
         return self.running and self.score >= self.hint_cost
 
+    # Saves the current run once (QUIT, LOSE or WIN) so the tracker can show it.
+    def _record(self, result):
+        if self.recorded:
+            return
+        self.recorded = True
+        self.runs.append(dict(result=result, found=len(self.done), total=len(self.words),
+                              score=self.score, style=self.style))
+
+    # Text shown under the score tracker table.
+    def tracker_summary(self):
+        if not self.runs:
+            return "No runs yet"
+        scores = [r["score"] for r in self.runs]
+        wins = sum(r["result"] == "WIN" for r in self.runs)
+        return "Runs: %d   Wins: %d   Best: %d   Average: %.1f" % (
+            len(self.runs), wins, max(scores), sum(scores) / len(scores))
+
     # Resets everything and starts a fresh game.
     def start_new(self):
+        if self.running:
+            self._record("QUIT")                 # new game pressed mid-game
         t = time.time()
         words, grid, style, tries, undone, positions = self.generator.generate()
         self.words = words
@@ -78,6 +100,8 @@ class WordSearchGame:
             % (style, tries, undone, time.time() - t)
         )
         self.stats_text = self.generator.format_stats()
+        self.style = style
+        self.recorded = False
 
     # Counts down the timer and ends game at zero.
     def tick(self):
@@ -93,6 +117,7 @@ class WordSearchGame:
             self.status_kind = "lose"
             self.status_text = "TIME'S UP - YOU LOSE"
             self.note_text = "The words you missed are shown in red"
+            self._record("LOSE")
             return "lose"
         self.left -= 1
         return "running"
@@ -154,6 +179,7 @@ class WordSearchGame:
         if len(self.done) == len(self.words):
             self.running = False
             self.score += self.left            # time bonus
+            self._record("WIN")
             self.status_kind = "win"
             self.status_text = "YOU WIN!"
             return "win"
